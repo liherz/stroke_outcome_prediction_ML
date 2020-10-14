@@ -1,0 +1,579 @@
+\documentclass{article}
+
+\usepackage{booktabs} % for nice tables with xtable
+\usepackage{longtable} % for tables across multiple pages
+\usepackage{placeins} % \FloatBarrier
+\usepackage{geometry}
+\usepackage{pdfpages, caption} % to include multiple pages of a pdf file
+
+
+\geometry{%
+  top=30mm, % 36
+  left=25mm,
+  right=25mm,
+  bottom=30mm,
+  headsep=10mm, % 26
+  footskip=10mm
+}
+
+\begin{document}
+
+<<libs, echo=F, include=F, warning=F>>=
+library(reporttools)
+library(xtable)
+library(reshape2)
+library(plyr)
+
+dir = "C:/Users/hezo/Dropbox/PhD/Stroke/PowerAnalyse_GewichteteMittelwerte_MixedModelSD_und_PredictionModel/"
+# dir = "/Users/janne.hamann/Dropbox/StatistikOtherSideProjekt/"
+
+source(paste0(dir,"analyses/functions/accuracy.R"))
+source(paste0(dir,"analyses/functions/specificity.R"))
+source(paste0(dir,"analyses/functions/sensitivity.R"))
+source(paste0(dir,"analyses/functions/wilson_ci.R"))
+@
+
+
+\section{Descriptives}
+
+
+\subsection{Baseline and patient characteristics}
+
+The following tables summarize baseline and patient characteristics for the variables that are considered within the models.
+
+<<bl_data, echo=F, include=T, results="asis">>=
+
+load(paste0(dir,"data/data_wide_all_nihss.R"))
+
+# get subgroups for mrs0 and mrs1
+mrs0 = dat[dat$mrs_3months_binary==0,]
+mrs1 = dat[dat$mrs_3months_binary==1,]
+
+dat$time_to_groin_puncture = as.numeric(dat$time_to_groin_puncture)
+dat$time_to_imaging = as.numeric(dat$time_to_imaging)
+mrs0$time_to_groin_puncture = as.numeric(mrs0$time_to_groin_puncture)
+mrs0$time_to_imaging = as.numeric(mrs0$time_to_imaging)
+mrs1$time_to_imaging = as.numeric(mrs1$time_to_imaging)
+mrs1$time_to_groin_puncture = as.numeric(mrs1$time_to_groin_puncture)
+
+cont_var = c("age","nihss_bl","sys_bloodpressure_bl","dias_bloodpressure_bl","glucose_bl","hba1c",
+             "ldl","hdl","triglyceride","crp","inr","time_to_imaging","time_to_groin_puncture",
+             "nihss_24h")
+
+means_dat = apply(dat[,cont_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_dat = apply(dat[,cont_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+na_dat = apply(dat[,cont_var], 2, function(x) sum(is.na(x)))
+
+means_mrs0 = apply(mrs0[,cont_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_mrs0 = apply(mrs0[,cont_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+na_mrs0 = apply(mrs0[,cont_var], 2, function(x) sum(is.na(x)))
+
+means_mrs1 = apply(mrs1[,cont_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_mrs1 = apply(mrs1[,cont_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+na_mrs1 = apply(mrs1[,cont_var], 2, function(x) sum(is.na(x)))
+
+test = c()
+for(i in cont_var){
+#   test_tmp = wilcox.test(dat[,i]~dat$mrs_3months_binary)
+  test = c(test, wilcox.test(mrs0[,i],mrs1[,i])$p.value)
+}
+
+tab_cont = cbind(means_mrs0,sd_mrs0,na_mrs0,means_mrs1,sd_mrs1,na_mrs1,means_dat, sd_dat, na_dat,test)
+colnames(tab_cont) = c("bad:mean", "bad:sd", "bad:NA", "good:mean", "good:sd", "good:NA",
+                       "all:mean", "all:sd", "all:NA", "p value")
+
+row.names(tab_cont) = gsub("_"," ", row.names(tab_cont))
+# tab_cont
+
+#### Categorical
+
+cat_var = c("sex","independent_pre_stroke","tah_pre_stroke","antikoagulation_pre_stroke",
+            "statin_pre_stroke","antihypertensiva_pre_stroke","atrial_fibrillation",
+            "rf_diabetes","rf_hypertonia","rf_hypercholesterinaemie","rf_smoker","rf_chd",
+            "rf_pavk","rf_tia_stroke","infarct_side",
+            "additional_occlusion","lyse","collateralization","anaesthesia","tici",
+            "intracranial_bleeding")
+
+dat_cat_var = dat[,cat_var]
+
+# dat_cat_var$mrs_3months_binary = revalue(dat_cat_var$mrs_3months_binary, c("0"="bad", "1"="good"))
+dat_cat_var$sex = revalue(dat_cat_var$sex, c("0"="male", "1"="female"))
+dat_cat_var$independent_pre_stroke = revalue(dat_cat_var$independent_pre_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$tah_pre_stroke = revalue(dat_cat_var$tah_pre_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$antikoagulation_pre_stroke = revalue(dat_cat_var$antikoagulation_pre_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$statin_pre_stroke = revalue(dat_cat_var$statin_pre_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$antihypertensiva_pre_stroke = revalue(dat_cat_var$antihypertensiva_pre_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$atrial_fibrillation = revalue(dat_cat_var$atrial_fibrillation, c("0"="no", "1"="yes"))
+dat_cat_var$rf_diabetes = revalue(dat_cat_var$rf_diabetes, c("0"="no", "1"="yes"))
+dat_cat_var$rf_hypertonia = revalue(dat_cat_var$rf_hypertonia, c("0"="no", "1"="yes"))
+dat_cat_var$rf_hypercholesterinaemie = revalue(dat_cat_var$rf_hypercholesterinaemie, c("0"="no", "1"="yes"))
+dat_cat_var$rf_smoker = revalue(dat_cat_var$rf_smoker, c("0"="no", "1"="yes"))
+dat_cat_var$rf_chd = revalue(dat_cat_var$rf_chd, c("0"="no", "1"="yes"))
+dat_cat_var$rf_pavk = revalue(dat_cat_var$rf_pavk, c("0"="no", "1"="yes"))
+dat_cat_var$rf_tia_stroke = revalue(dat_cat_var$rf_tia_stroke, c("0"="no", "1"="yes"))
+dat_cat_var$additional_occlusion = revalue(dat_cat_var$additional_occlusion, c("0"="no", "1"="yes"))
+dat_cat_var$lyse = revalue(dat_cat_var$lyse, c("0"="no", "1"="yes"))
+dat_cat_var$infarct_side = revalue(dat_cat_var$infarct_side, c("1"="left", "2"="right"))
+dat_cat_var$tici = revalue(dat_cat_var$tici, c("0"="0", "1"="1", "2"="2a", "3"="2b", "4"="3"))
+dat_cat_var$intracranial_bleeding = revalue(dat_cat_var$intracranial_bleeding, c("0"="no", "1"="yes"))
+
+
+# combine the results
+tab_cat = c()
+for(i in cat_var){
+  tab_tmp = table(dat_cat_var[,i],dat$mrs_3months_binary)
+  tab_all = table(dat_cat_var[,i])
+  prop_tab_all = (tab_all/sum(tab_all))*100
+  prop_tab_tmp = prop.table(tab_tmp, 2)*100
+  na = c(sum(is.na(dat_cat_var[dat_cat_var$mrs_3months_binary==0,i])), sum(is.na(dat_cat_var[dat_cat_var$mrs_3months_binary==1,i])))
+  na_all = sum(na)
+  test = fisher.test(dat$mrs_3months_binary,dat_cat_var[,i])
+  tab_tmp = cbind(tab_tmp[,1], prop_tab_tmp[,1], na[1], tab_tmp[,2], prop_tab_tmp[,2], na[2], tab_all, prop_tab_all, na_all, test$p.value)
+  row.names(tab_tmp) = paste(i,"=",row.names(tab_tmp))
+  tab_cat = rbind(tab_cat,tab_tmp)
+}
+colnames(tab_cat) = c("bad:N", "bad:%", "bad:NA", "good:N", "good:%", "good:NA", "all:N", "all:%", "all:NA", "p value")
+
+row.names(tab_cat) = gsub("_"," ", row.names(tab_cat))
+
+@
+
+<<print_bl_data_cont, echo=F, include=T, results="asis">>=
+# print the tables
+print(xtable(tab_cont,
+             caption=c("Mean, standard deviation and number of missing data for continuous baseline and patient characteristics. Split by outcome mRS 3 months."),
+             label="tab_cont",
+             align="lccc|ccc|cccc",
+             digits=c(0,2,2,0,2,2,0,2,2,0,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+<<plots_bl_data_cont, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+#### CBoxplots for continuous variables
+
+dat$time_to_imaging = as.numeric(dat$time_to_imaging)
+dat$time_to_groin_puncture = as.numeric(dat$time_to_groin_puncture)
+
+boxplot(dat$age~dat$mrs_3months_binary, ylab="Age", xlab="mRS after 3 months", main="Age")
+boxplot(dat$nihss_bl~dat$mrs_3months_binary, ylab="Baseline NIHSS", xlab="mRS after 3 months", main="NIHSS")
+# boxplot(dat$nihss_24h~dat$mrs_3months_binary, ylab="NIHSS 24h", xlab="mRS after 3 months")
+# boxplot(dat$nihss_3months~dat$mrs_3months_binary, ylab="NIHSS 3m", xlab="mRS after 3 months")
+boxplot(dat$sys_bloodpressure_bl~dat$mrs_3months_binary, ylab="Bloodpressure", xlab="mRS after 3 months", main="Baseline syst. Bloodpressure")
+boxplot(dat$dias_bloodpressure_bl~dat$mrs_3months_binary, ylab="Bloodpressure", xlab="mRS after 3 months", main="Baseline diast. Bloodpressure")
+boxplot(dat$glucose_bl~dat$mrs_3months_binary, ylab="Glucose", xlab="mRS after 3 months", main="Baseline Glucose")
+boxplot(dat$hba1c~dat$mrs_3months_binary, ylab="HBA1C", xlab="mRS after 3 months", main="Baseline HBA1C")
+boxplot(dat$ldl~dat$mrs_3months_binary, ylab="LDL", xlab="mRS after 3 months", main="Baseline LDL")
+boxplot(dat$hdl~dat$mrs_3months_binary, ylab="HDL", xlab="mRS after 3 months", main="Baseline HDL")
+boxplot(dat$triglyceride~dat$mrs_3months_binary, ylab="Triglyceride", xlab="mRS after 3 months", main="Baseline Triglyceride")
+boxplot(dat$crp~dat$mrs_3months_binary, ylab="CRP", xlab="mRS after 3 months", main="Baseline CRP")
+boxplot(dat$inr~dat$mrs_3months_binary, ylab="INR", xlab="mRS after 3 months", main="Baseline INR")
+boxplot(dat$time_to_groin_puncture~dat$mrs_3months_binary, ylab="Time to groin puncture", xlab="mRS after 3 months", main="Time to groin puncture")
+
+
+#### Continuous variables
+@
+
+\FloatBarrier
+
+<<print_bl_data_cat, echo=F, include=T, results="asis">>=
+print(xtable(tab_cat,
+             caption=c("Frequencies, percentages and number of missing data for categorical baseline and patient characteristics. Split by outcome mRS 3 months. P-values are obtained using Fisher's exact test."),
+             label="tab_cont",
+             align="lccc|ccc|cccc",
+             digits = c(0,0,2,0,0,2,0,0,2,0,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_bl_data_cat, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+plot(dat$sex~dat$mrs_3months_binary, ylab="Sex", xlab="mRS after 3 months",main="Sex")
+plot(dat$independent_pre_stroke~dat$mrs_3months_binary, ylab="Independent pre stroke", xlab="mRS after 3 months",main="Independent pre stroke")
+plot(dat$tah_pre_stroke~dat$mrs_3months_binary, ylab="TAH pre stroke", xlab="mRS after 3 months",main="TAH pre stroke")
+plot(dat$antikoagulation_pre_stroke~dat$mrs_3months_binary, ylab="Antikoagulation pre stroke", xlab="mRS after 3 months",main="Antikoagulation pre stroke")
+plot(dat$statin_pre_stroke~dat$mrs_3months_binary, ylab="Statin pre stroke", xlab="mRS after 3 months",main="Statin pre stroke")
+plot(dat$antihypertensiva_pre_stroke~dat$mrs_3months_binary, ylab="Antihypertensiva pre stroke", xlab="mRS after 3 months",main="Antihypertensiva pre stroke")
+plot(dat$atrial_fibrillation~dat$mrs_3months_binary, ylab="Atrial fibrillation", xlab="mRS after 3 months",main="Atrial fibrillation")
+plot(dat$rf_diabetes~dat$mrs_3months_binary, ylab="Diabetes", xlab="mRS after 3 months",main="Diabetes")
+plot(dat$rf_hypertonia~dat$mrs_3months_binary, ylab="Hypertonia", xlab="mRS after 3 months",main="Hypertonia")
+plot(dat$rf_hypercholesterinaemie~dat$mrs_3months_binary, ylab="Hypercholesterinaemie", xlab="mRS after 3 months",main="Hypercholesterinaemie")
+plot(dat$rf_smoker~dat$mrs_3months_binary, ylab="Smoker", xlab="mRS after 3 months",main="Smoker")
+plot(dat$rf_chd~dat$mrs_3months_binary, ylab="CHD", xlab="mRS after 3 months",main="CHD")
+plot(dat$rf_pavk~dat$mrs_3months_binary, ylab="PAVK", xlab="mRS after 3 months",main="PAVK")
+plot(dat$rf_tia_stroke~dat$mrs_3months_binary, ylab="TIA or Stroke before", xlab="mRS after 3 months",main="TIA Stroke before")
+plot(dat$infarct_side~dat$mrs_3months_binary, ylab="Infarct side", xlab="mRS after 3 months",main="Infarct side")
+plot(dat$additional_occlusion~dat$mrs_3months_binary, ylab="Additional Occlusion", xlab="mRS after 3 months",main="Additional Occlusion")
+plot(dat$lyse~dat$mrs_3months_binary, ylab="Lyse", xlab="mRS after 3 months",main="Lyse")
+
+# plot(dat$angio~dat$mrs_3months_binary, ylab="Angio", xlab="mRS after 3 months",main="Angio")
+# plot(dat$thrombectomy~dat$mrs_3months_binary, ylab="Thrombectomy", xlab="mRS after 3 months",main="Thrombectomy")
+# plot(dat$vessel_open_after_therapy~dat$mrs_3months_binary, ylab="Vessel open before therapy", xlab="mRS after 3 months",main="Vessel open before therapy")
+# plot(dat$mtici~dat$mrs_3months_binary, ylab="mTICI", xlab="mRS after 3 months", main="mTICI")
+# plot(dat$mtici_binary~dat$mrs_3months_binary, ylab="MTICI binary", xlab="mRS after 3 months",main="mTICI (binary)")
+
+
+@
+
+
+
+\FloatBarrier
+\subsection{MRI data}
+
+The following tables summarize the MRI information for the different parameters (rBF, rBV, TTP, TMAX, MTT, tMIP).
+
+<<mri_descriptives, echo=F, include=T, results="asis">>=
+
+mri_var = c("volume_adc", "volume_tmax","volume_rbf_adc","volume_rbf_tmax","volume_rbv_adc","volume_rbv_tmax","volume_tar")
+
+means_dat = apply(dat[,mri_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_dat = apply(dat[,mri_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+
+means_mrs0 = apply(mrs0[,mri_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_mrs0 = apply(mrs0[,mri_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+
+means_mrs1 = apply(mrs1[,mri_var], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+sd_mrs1 = apply(mrs1[,mri_var], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+
+test = c()
+for(i in mri_var){
+#   test_tmp = wilcox.test(dat[,i]~dat$mrs_3months_binary)
+  test = c(test,wilcox.test(mrs0[,i],mrs1[,i])$p.value)
+}
+
+tab_vol = cbind(means_mrs0,sd_mrs0,means_mrs1,sd_mrs1,means_dat, sd_dat, test)
+colnames(tab_vol) = c("bad outcome:mean", "bad outcome:sd", "good outcome:mean", "good outcome:sd","all:mean","all_sd","p value")
+
+
+
+load(paste0(dir,"data/data_rbf_wide_after_therapy.R"))
+rbf = dat
+load(paste0(dir,"data/data_rbv_wide_after_therapy.R"))
+rbv = dat
+load(paste0(dir,"data/data_ttp_wide_after_therapy.R"))
+ttp = dat
+load(paste0(dir,"data/data_tmax_wide_after_therapy.R"))
+tmax = dat
+load(paste0(dir,"data/data_mtt_wide_after_therapy.R"))
+mtt = dat
+load(paste0(dir,"data/data_tmip_wide_after_therapy.R"))
+tmip = dat
+
+all_vars = list(rbf,rbv,ttp,tmax,mtt,tmip)
+tabs = list()
+vars = c("C_LN","C_Th","C_Occ","C_Medp","C_Medm","C_Meda","C_Ant",
+         "S_LN","S_Th","S_Occ","S_Medp","S_Medm","S_Meda","S_Ant")
+
+for(i in 1:length(all_vars)){
+  print(i)
+  
+  dat_tmp = all_vars[[i]]
+  
+  mrs0 = dat_tmp[dat_tmp$mrs_3months_binary==0,]
+  mrs1 = dat_tmp[dat_tmp$mrs_3months_binary==1,]
+
+  means_dat_tmp = apply(dat_tmp[,vars], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+  sd_dat_tmp = apply(dat_tmp[,vars], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+  
+  means_mrs0 = apply(mrs0[,vars], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+  sd_mrs0 = apply(mrs0[,vars], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+  # na_mrs0 = apply(mrs0[,vars], 2, function(x) sum(is.na(x)))
+  
+  means_mrs1 = apply(mrs1[,vars], 2, function(x) round(mean(x,na.rm=TRUE),digits=2))
+  sd_mrs1 = apply(mrs1[,vars], 2, function(x) round(sd(x,na.rm=TRUE),digits=2))
+  # na_mrs1 = apply(mrs1[,vars], 2, function(x) sum(is.na(x)))
+  
+  test = c()
+  for(j in vars){
+    test = c(test,wilcox.test(mrs0[,j],mrs1[,j])$p.value)
+  }
+  
+  # tab_cont = cbind(means_mrs0,sd_mrs0,na_mrs0,means_mrs1,sd_mrs1,na_mrs1,test)
+  tab_cont = cbind(means_mrs0,sd_mrs0,means_mrs1,sd_mrs1,means_dat_tmp,sd_dat_tmp,test)
+  colnames(tab_cont) = c("bad outcome:mean", "bad
+                         outcome:sd", "good outcome:mean", "good outcome:sd", 
+                         "all:mean", "all_sd", "p value")
+  tabs[[i]] = tab_cont
+  
+}
+
+@
+
+
+
+%%%% Volume
+
+\FloatBarrier
+<<tab_mri_vol, echo=F, include=T, results="asis">>=
+# volumes
+print(xtable(tab_vol,
+             caption=c("Mean and standard deviation for \\textbf{volumes} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+<<plots_mri_vol, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+##### rBF
+dat_plot = dat[, c("volume_adc", "volume_tmax","volume_rbf_adc","volume_rbf_tmax","volume_rbv_adc",
+                   "volume_rbv_tmax","volume_tar","mrs_3months_binary")]
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$volume_adc~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: ADC")
+boxplot(dat_plot$volume_tmax~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: TMAX")
+boxplot(dat_plot$volume_rbf_adc~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: rBF ADC")
+boxplot(dat_plot$volume_rbf_tmax~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: rBF TMAX")
+boxplot(dat_plot$volume_rbv_adc~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: rBV ADC")
+boxplot(dat_plot$volume_rbv_tmax~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: rBV TMAX")
+boxplot(dat_plot$volume_tar~dat_plot$mrs_3months_binary, ylab="Volume", xlab="Outcome after 3 months (mRS)",main="Volume: Tissue at risk")
+@
+
+
+%%%% rBF
+\FloatBarrier
+
+<<tab_mri_rbf, echo=F, include=T, results="asis">>=
+# rbf
+print(xtable(tabs[[1]],
+             caption=c("Mean and standard deviation for \\textbf{rBF} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_rbf, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+##### rBF
+dat_plot = rbf
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="rBF: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="rBF: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="rBF: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="rBF: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="rBF: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="rBF: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="rBF: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="rBF: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="rBF: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="rBF: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="rBF: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="rBF: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="rBF: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="rBF: S_Ant")
+
+@
+
+
+%%%% rBV
+\FloatBarrier
+
+<<tab_mri_rbv, echo=F, include=T, results="asis">>=
+print(xtable(tabs[[2]],
+             caption=c("Mean and standard deviation for \\textbf{rBV} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_rbv, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+dat_plot = rbv
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="rBV: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="rBV: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="rBV: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="rBV: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="rBV: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="rBV: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="rBV: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="rBV: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="rBV: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="rBV: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="rBV: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="rBV: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="rBV: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="rBV: S_Ant")
+
+
+@
+
+
+%%%% TTP
+\FloatBarrier
+
+<<tab_mri_ttp, echo=F, include=T, results="asis">>=
+print(xtable(tabs[[3]],
+             caption=c("Mean and standard deviation for \\textbf{TTP} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_ttp, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+dat_plot = ttp
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="TTP: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="TTP: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="TTP: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="TTP: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="TTP: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="TTP: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="TTP: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="TTP: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="TTP: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="TTP: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="TTP: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="TTP: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="TTP: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="TTP: S_Ant")
+
+@
+
+
+%%%% TMAX
+\FloatBarrier
+
+<<tab_mri_tmax, echo=F, include=T, results="asis">>=
+print(xtable(tabs[[4]],
+             caption=c("Mean and standard deviation for \\textbf{TMAX} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_tmax, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+dat_plot = tmax
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="TMAX: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="TMAX: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="TMAX: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="TMAX: S_Ant")
+@
+
+
+%%%% MTT
+\FloatBarrier
+
+<<tab_mri_mtt, echo=F, include=T, results="asis">>=
+print(xtable(tabs[[5]],
+             caption=c("Mean and standard deviation for \\textbf{MTT} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_mtt, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+dat_plot = mtt
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="MTT: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="MTT: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="MTT: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="MTT: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="MTT: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="MTT: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="MTT: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="MTT: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="MTT: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="MTT: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="MTT: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="MTT: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="MTT: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="MTT: S_Ant")
+@
+
+
+
+%%%% tMIP
+\FloatBarrier
+
+<<tab_mri_tmip, echo=F, include=T, results="asis">>=
+print(xtable(tabs[[6]],
+             caption=c("Mean and standard deviation for \\textbf{tMIP} split by outcome mRS 3 months. P-values are obtained using a Wilcoxon test at the 5\\% significance level."),
+             label="tab_cont",
+             align="lcc|cc|ccc",
+             digits=c(0,2,2,2,2,2,2,3)),
+      caption.placement="top",
+      booktabs=TRUE,
+      table.placement='h',
+      size='small')
+@
+
+
+<<plots_mri_tmip, echo=F, include=T, warning=F, out.width="0.48\\textwidth", fig.show="hold", fig.align='center', fig.ncol=2>>=
+
+dat_plot = tmip
+dat_plot$mrs_3months_binary = revalue(dat_plot$mrs_3months_binary, c("0"="bad", "1"="good"))
+
+boxplot(dat_plot$C_LN~dat_plot$mrs_3months_binary, ylab="C_LN", xlab="Outcome after 3 months (mRS)",main="tMIP: C_LN")
+boxplot(dat_plot$C_Th~dat_plot$mrs_3months_binary, ylab="C_Th", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Th")
+boxplot(dat_plot$C_Occ~dat_plot$mrs_3months_binary, ylab="C_Occ", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Occ")
+boxplot(dat_plot$C_Medp~dat_plot$mrs_3months_binary, ylab="C_Medp", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Medp")
+boxplot(dat_plot$C_Medm~dat_plot$mrs_3months_binary, ylab="C_Medm", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Medm")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Meda", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Meda")
+boxplot(dat_plot$C_Meda~dat_plot$mrs_3months_binary, ylab="C_Ant", xlab="Outcome after 3 months (mRS)",main="tMIP: C_Ant")
+boxplot(dat_plot$S_LN~dat_plot$mrs_3months_binary, ylab="S_LN", xlab="Outcome after 3 months (mRS)",main="tMIP: S_LN")
+boxplot(dat_plot$S_Th~dat_plot$mrs_3months_binary, ylab="S_Th", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Th")
+boxplot(dat_plot$S_Occ~dat_plot$mrs_3months_binary, ylab="S_Occ", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Occ")
+boxplot(dat_plot$S_Medp~dat_plot$mrs_3months_binary, ylab="S_Medp", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Medp")
+boxplot(dat_plot$S_Medm~dat_plot$mrs_3months_binary, ylab="S_Medm", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Medm")
+boxplot(dat_plot$S_Meda~dat_plot$mrs_3months_binary, ylab="S_Meda", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Meda")
+boxplot(dat_plot$S_Ant~dat_plot$mrs_3months_binary, ylab="S_Ant", xlab="Outcome after 3 months (mRS)",main="tMIP: S_Ant")
+@
+
+
+
+
+\end{document}
